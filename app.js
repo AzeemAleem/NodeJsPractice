@@ -1,5 +1,5 @@
 const path = require("path");
-const db = require("./util/database");
+const sequelize = require("./util/database");
 const express = require("express");
 const bodyParser = require("body-parser");
 
@@ -13,8 +13,6 @@ app.set("views", "views");
 const adminRoutes = require("./routes/admin");
 const shopRoutes = require("./routes/shop");
 
-
-
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -23,7 +21,13 @@ app.use(shopRoutes);
 
 app.use(errorController.get404);
 
-app.listen(8080);
+sequelize
+  .sync()
+  .then((res) => {
+    console.log(res);
+    app.listen(8080);
+  })
+  .catch((err) => console.log(err));
 
 // http
 //   .createServer((req, res) => {
