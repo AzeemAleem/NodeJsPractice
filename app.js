@@ -1,95 +1,76 @@
-const path = require("path");
-const express = require("express");
-const bodyParser = require("body-parser");
-const errorController = require("./controllers/error");
-const mongoose = require("mongoose");
+const path = require('path');
+
+const express = require('express');
+const bodyParser = require('body-parser');
+const mongoose = require('mongoose');
+const session = require('express-session');
+const MongoDBStore = require('connect-mongodb-session')(session);
+
+const errorController = require('./controllers/error');
+const User = require('./models/user');
+
+const MONGODB_URI =
+  'mongodb+srv://azeemaleem:Jn0ZB1F4OtgYhxPb@cluster0.0tnogk2.mongodb.net/shop?retryWrites=true&w=majority';
 
 const app = express();
+const store = new MongoDBStore({
+  uri: MONGODB_URI,
+  collection: 'sessions'
+});
 
-app.set("view engine", "ejs");
-app.set("views", "views");
+app.set('view engine', 'ejs');
+app.set('views', 'views');
 
-const adminRoutes = require("./routes/admin");
-const shopRoutes = require("./routes/shop");
-const User = require("./models/user");
+const adminRoutes = require('./routes/admin');
+const shopRoutes = require('./routes/shop');
+const authRoutes = require('./routes/auth');
 
 app.use(bodyParser.urlencoded({ extended: false }));
-app.use(express.static(path.join(__dirname, "public")));
+app.use(express.static(path.join(__dirname, 'public')));
+app.use(
+  session({
+    secret: 'my secret',
+    resave: false,
+    saveUninitialized: false,
+    store: store
+  })
+);
 
 app.use((req, res, next) => {
-  User.findById("63e5c014e0b2c882cf6ee65f")
-    .then((user) => {
+  if (!req.session.user) {
+    return next();
+  }
+  User.findById(req.session.user._id)
+    .then(user => {
       req.user = user;
       next();
     })
-    .catch((err) => console.log(err));
+    .catch(err => console.log(err));
 });
 
-app.use("/admin", adminRoutes);
+app.use('/admin', adminRoutes);
 app.use(shopRoutes);
+app.use(authRoutes);
 
 app.use(errorController.get404);
 
 mongoose
-  .connect(
-    "mongodb+srv://azeemaleem:Jn0ZB1F4OtgYhxPb@cluster0.0tnogk2.mongodb.net/shop?retryWrites=true&w=majority"
-  )
-  .then((result) => {
-    User.findOne()
-      .then((user) => {
-        if (!user) {
-          const user = new User({
-            name: "azeem",
-            email: "azeem@gmail.com",
-            cart: { items: [] },
-          });
-          user.save();
-        }
-      })
-      .catch((err) => console.log(err));
-
-    console.log("db connected");
+  .connect(MONGODB_URI)
+  .then(result => {
+    // User.findOne().then(user => {
+    //   if (!user) {
+    //     const user = new User({
+    //       name: 'azeem',
+    //       email: 'azeem@test.com',
+    //       cart: {
+    //         items: []
+    //       }
+    //     });
+    //     user.save();
+    //   }
+    // });
     app.listen(8080);
   })
-  .catch((err) => console.log(err));
-
-// http
-//   .createServer((req, res) => {
-//     res.writeHead(200, { "Content-type": "text/html" });
-//     // var q = url.parse(req.url, true).query;
-//     // var txt = q.year + " " + q.month;
-//     res.write(dt.date());
-//     res.end();
-//   })
-//   .listen(8080);
-
-// let email = true;
-// let password = true;
-// let pro = function createOrder() {
-//   let pro = new Promise((resolve, reject) => {
-//     if (email && password) {
-//       resolve("I am resolved");
-//     } else {
-//       reject("Please handle the promise");
-//     }
-//   });
-//   return pro;
-// };
-
-// pro()
-//   .then((data) => {
-//     console.log(data, "data");
-//   })
-//   .catch((err) => {
-//     console.log(err, "error");
-//   });
-// let response = fetch("https://jsonplaceholder.typicode.com/todos/1");
-// response
-//   .then((data) => {
-//     // console.log(data.json(), "Hello");
-//     return data.json();
-//   })
-//   .then((data) => {
-//     console.log(data, "Hello2");
-//   });
-// console.log(response);
+  .catch(err => {
+    console.log(err);
+  });
