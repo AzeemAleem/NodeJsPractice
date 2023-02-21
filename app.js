@@ -1,54 +1,68 @@
-const path = require('path');
+const path = require("path");
 
-const express = require('express');
-const bodyParser = require('body-parser');
-const mongoose = require('mongoose');
-const session = require('express-session');
-const MongoDBStore = require('connect-mongodb-session')(session);
+const express = require("express");
+const bodyParser = require("body-parser");
+const mongoose = require("mongoose");
+const session = require("express-session");
+const MongoDBStore = require("connect-mongodb-session")(session);
 
-const errorController = require('./controllers/error');
-const User = require('./models/user');
+const errorController = require("./controllers/error");
+const User = require("./models/user");
+const csrf = require("csurf");
+const flash = require("connect-flash");
 
 const MONGODB_URI =
-  'mongodb+srv://azeemaleem:Jn0ZB1F4OtgYhxPb@cluster0.0tnogk2.mongodb.net/shop?retryWrites=true&w=majority';
+  "mongodb+srv://azeemaleem:Jn0ZB1F4OtgYhxPb@cluster0.0tnogk2.mongodb.net/shop?retryWrites=true&w=majority";
+
+// 'mongodb+srv://azeemaleem:Jn0ZB1F4OtgYhxPb@cluster0.0tnogk2.mongodb.net/shop?retryWrites=true&w=majority';
 
 const app = express();
+const csrfProtection = csrf();
+
 const store = new MongoDBStore({
   uri: MONGODB_URI,
-  collection: 'sessions'
+  collection: "sessions",
 });
 
-app.set('view engine', 'ejs');
-app.set('views', 'views');
+app.set("view engine", "ejs");
+app.set("views", "views");
 
-const adminRoutes = require('./routes/admin');
-const shopRoutes = require('./routes/shop');
-const authRoutes = require('./routes/auth');
+const adminRoutes = require("./routes/admin");
+const shopRoutes = require("./routes/shop");
+const authRoutes = require("./routes/auth");
 
 app.use(bodyParser.urlencoded({ extended: false }));
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, "public")));
 app.use(
   session({
-    secret: 'my secret',
+    secret: "my secret",
     resave: false,
     saveUninitialized: false,
-    store: store
+    store: store,
   })
 );
+app.use(csrfProtection);
+app.use(flash());
 
 app.use((req, res, next) => {
   if (!req.session.user) {
     return next();
   }
   User.findById(req.session.user._id)
-    .then(user => {
+    .then((user) => {
       req.user = user;
       next();
     })
-    .catch(err => console.log(err));
+    .catch((err) => console.log(err));
 });
 
-app.use('/admin', adminRoutes);
+app.use((req, res, next) => {
+  (res.locals.isAuthenticated = req.session.isLoggedIn),
+    (res.locals.csrfToken = req.csrfToken()),
+    next();
+});
+
+app.use("/admin", adminRoutes);
 app.use(shopRoutes);
 app.use(authRoutes);
 
@@ -56,7 +70,7 @@ app.use(errorController.get404);
 
 mongoose
   .connect(MONGODB_URI)
-  .then(result => {
+  .then((result) => {
     // User.findOne().then(user => {
     //   if (!user) {
     //     const user = new User({
@@ -69,8 +83,9 @@ mongoose
     //     user.save();
     //   }
     // });
+    console.log("app running at 8080");
     app.listen(8080);
   })
-  .catch(err => {
+  .catch((err) => {
     console.log(err);
   });
