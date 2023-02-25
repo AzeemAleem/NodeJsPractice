@@ -2,6 +2,7 @@ const User = require("../models/user");
 const bcrypt = require("bcryptjs");
 const nodemailer = require("nodemailer");
 const sendgridTransport = require("nodemailer-sendgrid-transport");
+const crypto = require("crypto");
 
 const transporter = nodemailer.createTransport(
   sendgridTransport({
@@ -108,5 +109,52 @@ exports.postLogout = (req, res, next) => {
   req.session.destroy((err) => {
     console.log(err);
     res.redirect("/");
+  });
+};
+
+exports.getReset = (req, res, next) => {
+  let message = req.flash("error");
+  if (message.length > 0) {
+    message = message[0];
+  } else {
+    message = null;
+  }
+  res.render("auth/reset", {
+    path: "/reset",
+    pageTitle: "Reset Password",
+    errorMessage: message,
+  });
+};
+
+exports.postReset = (req, res, next) => {
+  crypto.randomBytes(32, (err, buffer) => {
+    if (err) {
+      console.log(err);
+      res.redirect("/reset");
+    } else {
+      const token = buffer.toString("hex");
+      User.findOne({ email: req.body.email })
+        .then((user) => {
+          if (!user) {
+            req.flash("error", "No account Found with this email");
+            res.redirect("/reset");
+          }
+          user.resetToken = token;
+          user.resetTokenExpiration = Date.now() + 3600000;
+          return user.save();
+        })
+        .then((result) => {
+          res.redirect("/");
+          return transporter
+            .sendMail({
+              to: req.body.email,
+              from: "random@yopmail.com",
+              subject: "Reset Password Email",
+              html: "Hello Boys",
+            })
+            .catch((err) => console.log(err));
+        })
+        .catch((err) => console.log(err));
+    }
   });
 };
